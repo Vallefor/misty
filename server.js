@@ -9,6 +9,7 @@ var phantomCache = './cache';
 var tmpDirPath = './tmp';
 
 var cacheTime=1000*60*60; //millisec
+cacheTime=1000*5;
 
 if (!fs.existsSync(tmpDirPath)){
     fs.mkdirSync(tmpDirPath);
@@ -18,6 +19,7 @@ if (!fs.existsSync(phantomCache)){
     fs.mkdirSync(phantomCache);
 }
 
+var working={};
 
 let port=9999;
 console.log("Starting... ");
@@ -27,7 +29,7 @@ function getPage(url,callback) {
   var phInstance = null;
 
   phantom.create([
-    '--disk-cache=true',
+//    '--disk-cache=true',
     '--load-images=false',
     `--disk-cache-path=${phantomCache}`,
     '--max-disk-cache-size=102400',
@@ -43,12 +45,22 @@ function getPage(url,callback) {
       console.log("page here",typeof page);
 
       page.setting('loadImages', false);
-      page.setting('loadCSS', false);
+      //page.setting('loadCSS', false);
+      var resCount=0;
+
+      /*
+      page.property('onResourceReceived', true, function(requestData) {
+        resCount--;
+        console.log("res count onResourceReceived",resCount);
+      });
+      */
       page.property('onResourceRequested', function(requestData, request) {
         var arr=requestData.url.split(".");
-        console.log(arr[arr.length-1]);
+        console.log("request",requestData.url);
         if(arr[arr.length-1]=="css") {
           request.abort();
+        } else {
+          console.log("res count",resCount);
         }
 
       });
@@ -56,8 +68,30 @@ function getPage(url,callback) {
       page.open(url).then(function(){
         console.log("on page!");
         page.property('content').then(function (content) {
-          callback(content);
-          phInstance.exit();
+          var returnFunction=function(){
+            callback(content);
+            phInstance.exit();
+          };
+          returnFunction();
+          /*
+          if(resCount==0) {
+            console.log("res count",resCount);
+            returnFunction();
+          } else {
+            var interval=setInterval(function(){
+              console.log("res count",resCount);
+              if(resCount==0) {
+                returnFunction();
+              }
+            },10);
+
+            setTimeout(function(){
+              clearInterval(interval);
+              returnFunction();
+            },5000);
+          }
+          */
+
         });
       });
 
@@ -85,12 +119,17 @@ function getPage(url,callback) {
 
         var readPage=function() {
           getPage(post.url,function(content) {
-            //console.log("lalala");
-            //console.log(content);
-            fs.writeFile(cacheFile, content, function () {
-              console.log("cache file write end");
-              response.end(content);
-            });
+
+            /*if(!working[cacheFile]) {
+              working[cacheFile]=true;*/
+              fs.writeFile(cacheFile, content,function(){
+                console.log('delete '+cacheFile);
+                delete working[cacheFile];
+              });
+            //}
+
+            response.end(content);
+
             console.log("done");
 
           });
@@ -98,6 +137,17 @@ function getPage(url,callback) {
 
 
         fs.stat(cacheFile, (err,stat)=>{
+
+          var readAndSend=function() {
+            fs.readFile(cacheFile, (err, data)=> {
+              if (data) {
+                response.end(data);
+              } else {
+                readPage();
+              }
+            });
+          };
+
           if(stat) {
             console.log("stat",stat,err,cacheFile);
 
@@ -106,19 +156,35 @@ function getPage(url,callback) {
             var timeDif=curDate.getTime()-fileDate.getTime();
 
             if(timeDif>cacheTime) { //10 min
-              readPage();
+              if(!working[cacheFile]) {
+                working[cacheFile]=true;
+                getPage(post.url,function(content) {
+                  fs.writeFile(cacheFile, content,function(){
+                    delete working[cacheFile];
+                  });
+                });
+              }
+              readAndSend();
             } else {
-              fs.readFile(cacheFile, (err, data)=> {
-                if (data) {
-                  response.end(data);
-                } else {
-                  readPage();
-                }
-              });
+              readAndSend();
             }
 
           } else {
-            readPage();
+            if(working[cacheFile]) {
+
+              var intervalWork=setInterval(()=>{
+                if(!working[cacheFile]) {
+                  clearInterval(intervalWork);
+                  readAndSend();
+                } else {
+                  console.log("working = true");
+                }
+              },100);
+
+            } else {
+              working[cacheFile]=true;
+              readPage();
+            }
           }
         });
 
