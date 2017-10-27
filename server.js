@@ -1,3 +1,4 @@
+
 var http = require('http');
 var phantom = require('phantom');
 var qs = require('querystring');
@@ -172,8 +173,8 @@ function getPage(url,callback) {
                   const status=jsHttpStatus?jsHttpStatus:httpStatus;
                   console.log("http status is", status);
                   setTimeout(function(){
-                    callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
-                    //callback({httpStatus: status, content: contentParser(content)});
+                    //callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
+                    callback({httpStatus: status, content: contentParser(content)});
                     /*console.log(content);
                     callback({httpStatus: status, content: content});*/
                   },4000);
