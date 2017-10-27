@@ -9,10 +9,12 @@ var phantomCache = './cache';
 var tmpDirPath = './tmp';
 
 var sendDataWileCacheRefresh=false;
+var returnAsJson=false;
 
 var cacheTime=1000*60*60; //millisec
 //cacheTime=1000*5;
 cacheTime=false; //disable cache by default
+
 
 if (!fs.existsSync(tmpDirPath)){
     fs.mkdirSync(tmpDirPath);
@@ -23,6 +25,10 @@ if (!fs.existsSync(phantomCache)){
 }
 
 var working={};
+
+var contentParser=function(content) {
+  return ":((";
+};
 
 
 let port=9999;
@@ -164,7 +170,8 @@ function getPage(url,callback) {
                   const status=jsHttpStatus?jsHttpStatus:httpStatus;
                   console.log("http status is", status);
                   setTimeout(function(){
-                    callback(JSON.stringify({httpStatus: status, content: content}));
+                    //callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
+                    callback({httpStatus: status, content: contentParser(content)});
                   },4000);
 
                   loadedPagesBusy[pageOb.index]=false;
@@ -212,14 +219,19 @@ function getPage(url,callback) {
               working[cacheFile]=true;*/
             if(cacheTime!==false) {
               console.log('write cache ' + cacheFile);
-              fs.writeFile(cacheFile, content, function () {
+              fs.writeFile(cacheFile, JSON.stringify(content), function () {
                 console.log('delete ' + cacheFile);
                 delete working[cacheFile];
               });
             }
             //}
 
-            response.end(content);
+            if(returnAsJson) {
+              response.end(JSON.stringify(content));
+            } else {
+              response.statusCode=content.httpStatus;
+              response.end(content.content);
+            }
 
             console.log("done");
 
@@ -232,7 +244,13 @@ function getPage(url,callback) {
             var readAndSend = function () {
               fs.readFile(cacheFile, (err, data)=> {
                 if (data) {
-                  response.end(data);
+                  if(returnAsJson) {
+                    response.end(data);
+                  } else {
+                    var data=JSON.parse(data);
+                    response.statusCode = data.httpStatus;
+                    response.end(data.content);
+                  }
                 } else {
                   readPage();
                 }
@@ -251,9 +269,14 @@ function getPage(url,callback) {
                   working[cacheFile] = true;
                   getPage(getVars.url, function (content) {
                     if (!sendDataWileCacheRefresh) {
-                      response.end(content);
+                      if(returnAsJson) {
+                        response.end(JSON.stringify(content));
+                      } else {
+                        response.statusCode=content.httpStatus;
+                        response.end(content.content);
+                      }
                     }
-                    fs.writeFile(cacheFile, content, function () {
+                    fs.writeFile(cacheFile, JSON.stringify(content), function () {
                       delete working[cacheFile];
                     });
                   });
