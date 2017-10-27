@@ -27,7 +27,8 @@ if (!fs.existsSync(phantomCache)){
 var working={};
 
 var contentParser=function(content) {
-  return ":((";
+  //return content;
+  return content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,'');
 };
 
 
@@ -35,6 +36,7 @@ let port=9999;
 console.log("Starting... ");
 
 function normalizeUrl(url) {
+  return url;
   url=url.toLowerCase();
   url=url.replace(/\/$/, "");
   return url;
@@ -170,8 +172,10 @@ function getPage(url,callback) {
                   const status=jsHttpStatus?jsHttpStatus:httpStatus;
                   console.log("http status is", status);
                   setTimeout(function(){
-                    //callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
-                    callback({httpStatus: status, content: contentParser(content)});
+                    callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
+                    //callback({httpStatus: status, content: contentParser(content)});
+                    /*console.log(content);
+                    callback({httpStatus: status, content: content});*/
                   },4000);
 
                   loadedPagesBusy[pageOb.index]=false;
