@@ -1,6 +1,7 @@
 
 var http = require('http');
-var phantom = require('phantom');
+//var phantom = require('phantom');
+const phantom = require('phantom');
 var qs = require('querystring');
 var system = require('system');
 var fs = require('fs');
@@ -48,6 +49,7 @@ let loadedPages=[];
 let loadedPagesBusy=[];
 let globalPhantom;
 let startTimerGlobal=new Date().getTime();
+/*
 phantom.create([
     '--disk-cache=true',
     '--load-images=false',
@@ -66,135 +68,188 @@ phantom.create([
     return Promise.all(pages);
   }).then(pages=>{
     loadedPages=pages;
-    //console.log("pages",pages);
-    /*console.log("manypage loaded",new Date().getTime()-startTimerGlobal);
-    pageLast.open("https://stockrow.com").then(function(){
-      console.log("on page!");
-    });*/
   });
+  */
 
 function getBrowserTab()
 {
-  for(let i in loadedPages) {
-    if(!loadedPagesBusy[i]) {
-      return { index:i, page:loadedPages[i] };
-    }
-  }
-  return getBrowserTab();
+  return phantom.create([
+    '--disk-cache=true',
+    '--load-images=false',
+    `--disk-cache-path=${phantomCache}`,
+    '--max-disk-cache-size=10240000',
+    `--cookies-file=${__dirname}/cache/cookie.txt`,
+    //'--debug=true'
+  ]).then(ph=> {
+    console.log("created");
+    ph.cookiesEnabled=false;
+    globalPhantom=ph;
+    return ph.createPage();
+  });
+
+}
+async function getPageV2(url,callback) {
+
+  const instance = await phantom.create();
+  const page = await instance.createPage();
+
+  await page.property("onConsoleMessage", function(msg) { console.log(msg)});
+
+  await page.on('onResourceRequested', function(requestData,request) {
+    console.info('Requesting', requestData.url);
+  });
+
+  await page.on('onResourceReceived', function(requestData) {
+    console.info('Received', requestData.url);
+  });
+
+
+
+  const status = await page.open(url);
+  setTimeout(async ()=> {
+    const content = await page.property('content');
+    await instance.exit();
+    callback(content);
+  },5000);
+
+  return false;
 }
 
+getPageV2('http://develop.myanimeshelf.com:3000',function(data){
+  console.log('content',data)
+});
+
+return;
+
 function getPage(url,callback) {
-  let startTimer=new Date().getTime();
+
+
+
+
+  let startTimer = new Date().getTime();
 
   var sitepage = null;
   var phInstance = null;
-      let pageOb=getBrowserTab();
-      loadedPagesBusy[pageOb.index]=true;
-      let page=pageOb.page;
+  let pageOb = getBrowserTab();
+  pageOb.then(page=> {
 
-      console.log("page here",new Date().getTime()-startTimer);
-      page.setting('loadImages', false);
-      //page.setting('loadCSS', false);
-      var resCount=0;
-      //let httpStatus=0;
-      //let exchanger={ httpStatus:0, url:url };
-      let exchanger=globalPhantom.createOutObject();
-      exchanger.url=url;
-      exchanger.normalizeUrl=normalizeUrl;
-      exchanger.requestCounter=0;
-      exchanger.requestSumm=0;
-      page.property('onResourceReceived', function(resource,exchanger){
-        if(resource.stage=="start") {
-          exchanger.requestCounter++;
-          console.log("counter inc",exchanger.requestCounter,exchanger.requestSumm,resource.url);
+    //let page = pageOb.page;
+
+    console.log("page here", new Date().getTime() - startTimer);
+    page.setting('loadImages', false);
+    //page.setting('loadCSS', false);
+    var resCount = 0;
+    //let httpStatus=0;
+    //let exchanger={ httpStatus:0, url:url };
+    let exchanger = globalPhantom.createOutObject();
+    exchanger.url = url;
+    exchanger.normalizeUrl = normalizeUrl;
+    exchanger.requestCounter = 0;
+    exchanger.requestSumm = 0;
+    page.property('onResourceReceived', function (resource, exchanger) {
+      if (resource.stage == "start") {
+        exchanger.requestCounter++;
+        console.log("counter inc", exchanger.requestCounter, exchanger.requestSumm, resource.url);
+      }
+      if (resource.stage == "end") {
+        //console.log('received', resource.url);
+        if (resource.url) {
+          exchanger.requestCounter--;
+          console.log("counter dec", exchanger.requestCounter, exchanger.requestSumm, resource.status, resource.url);
         }
-        if(resource.stage=="end") {
-          //console.log('received', resource.url);
-          if(resource.url) {
-            exchanger.requestCounter--;
-            console.log("counter dec", exchanger.requestCounter,exchanger.requestSumm, resource.status, resource.url);
-          }
-          if(exchanger.url==exchanger.normalizeUrl(resource.url)) {
-            exchanger.httpStatus=resource.status;
-            //console.log('onResourceReceived', resource.url, resource.status, exchanger.httpStatus, exchanger.url);
-            //return exchanger;
-          }
+        if (exchanger.url == exchanger.normalizeUrl(resource.url)) {
+          exchanger.httpStatus = resource.status;
+          //console.log('onResourceReceived', resource.url, resource.status, exchanger.httpStatus, exchanger.url);
+          //return exchanger;
         }
-      },exchanger);
+      }
+    }, exchanger);
 
 
-      page.property('onResourceRequested', function(requestData, request) {
-        var arr=requestData.url.split(".");
-        console.log("---------- request",requestData.url);
-        if(
-          requestData.url.indexOf("googlesyndication")>-1
-          ||
-          requestData.url.indexOf("googleads")>-1
-          ||
-          requestData.url.indexOf("gstatic.com/recaptcha")>-1
-          ||
-          requestData.url.indexOf("google-analytics")>-1
+    page.property('onResourceRequested', function (requestData, request) {
+      var arr = requestData.url.split(".");
+      console.log("---------- request", requestData.url);
+      if (
+        requestData.url.indexOf("googlesyndication") > -1
+        ||
+        requestData.url.indexOf("googleads") > -1
+        ||
+        requestData.url.indexOf("gstatic.com/recaptcha") > -1
+        ||
+        requestData.url.indexOf("google-analytics") > -1
           /*||
-          requestData.url.indexOf("cdn.ravenjs.com")>-1*/
-          ||
-          requestData.url.indexOf("www.google.com/recaptcha")>-1
-        ){
-          request.abort();
-        }
-        if(arr[arr.length-1]=="css") {
-          request.abort();
-        } else {
-          //exchanger.requestSumm++;
-        }
+           requestData.url.indexOf("cdn.ravenjs.com")>-1*/
+        ||
+        requestData.url.indexOf("www.google.com/recaptcha") > -1
+      ) {
+        request.abort();
+      }
+      if (arr[arr.length - 1] == "css") {
+        request.abort();
+      } else {
+        //exchanger.requestSumm++;
+      }
 
-      });
+    });
 
-      page.open(url).then(function(){
-        console.log("on page!");
+    page.open(url).then(function () {
+      console.log("on page!");
 
-        var onPageExec=function() {
-          exchanger.property("httpStatus").then((httpStatus)=> {
-            console.log("here status is",httpStatus,exchanger.httpStatus);
-          });
-
-          page.property('content').then(function (content) {
+      //var onPageExec = function () {
+      /*exchanger.property("httpStatus").then((httpStatus)=> {
+       console.log("here status is", httpStatus, exchanger.httpStatus);
+       });*/
 
 
+      //};
+      /*setTimeout(()=> {
+       onPageExec();
+       }, 3000);*/
+      page.property('content').then(function (content) {
 
-            page.evaluate(function () {
-              if (document.getElementById('httpStatus')) {
-                return parseInt(document.getElementById('httpStatus').innerHTML);
-              } else {
-                return null;
-              }
-            }).then(function (jsHttpStatus) {
-              let returnFunction = function () {
-                exchanger.property("httpStatus").then((httpStatus)=> {
-                  const status=jsHttpStatus?jsHttpStatus:httpStatus;
-                  console.log("http status is", status);
-                  setTimeout(function(){
-                    //callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
-                    callback({httpStatus: status, content: contentParser(content)});
-                    /*console.log(content);
-                    callback({httpStatus: status, content: content});*/
-                  },4000);
-
-                  loadedPagesBusy[pageOb.index]=false;
-                  //phInstance.exit();
-                });
-              };
-              returnFunction();
-
-            });
-
-          });
+        var returnFunction = function () {
+          console.log(content);
+          callback(content);
+          globalPhantom.exit();
         };
-        setTimeout(()=>{
-          onPageExec();
-        },3000);
+        setTimeout(()=> {
+          returnFunction();
+        }, 5000);
 
+        /*
+         page.evaluate(function () {
+         if (document.getElementById('httpStatus')) {
+         return parseInt(document.getElementById('httpStatus').innerHTML);
+         } else {
+         return null;
+         }
+         }).then(function (jsHttpStatus) {
+         let returnFunction = function () {
+         exchanger.property("httpStatus").then((httpStatus)=> {
+         const status = jsHttpStatus ? jsHttpStatus : httpStatus;
+         console.log("http status is", status);
+         setTimeout(function () {
+         //callback(JSON.stringify({httpStatus: status, content: contentParser(content)}));
+         callback({httpStatus: status, content: contentParser(content)});
+         }, 4000);
+
+
+         //phInstance.exit();
+         });
+         };
+         returnFunction();
+
+         });
+         */
 
       });
+
+
+    });
+
+  });
+
+
 }
 
 
