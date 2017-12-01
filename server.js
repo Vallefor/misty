@@ -21,7 +21,11 @@ if (enableCache && !fs.existsSync(cacheDir)) {
 
 let chromeTa=false;
 
-async function getPage(url) {
+function log(str) {
+  console.log(str);
+}
+
+async function getPage(url, options={}) {
   clearTimeout(chromeTa);
 
   chromeTa=setTimeout(()=>{
@@ -45,13 +49,14 @@ async function getPage(url) {
   const page = await browser.newPage();
   await page.setRequestInterception(true);
 
-  //do not load images and css
+  //do not load images, svg and css
   page.on('request', interceptedRequest => {
     if (
       interceptedRequest.url.endsWith('.png') ||
       interceptedRequest.url.endsWith('.jpg') ||
       interceptedRequest.url.endsWith('.jpeg') ||
       interceptedRequest.url.endsWith('.gif') ||
+      interceptedRequest.url.endsWith('.svg') ||
       interceptedRequest.url.endsWith('.css')
     ) {
       interceptedRequest.abort();
@@ -62,10 +67,47 @@ async function getPage(url) {
 
   await page.setViewport({width: 1280, height: 800 });
   const response=await page.goto(url);
-  await page.waitForFunction("document.querySelectorAll('.loadingText').length == 0",{ timeout: 10000 });
+  try {
+    await page.waitForFunction(function () {
+      if (document.querySelectorAll('.loadingText').length == 0) {
+        return true;
+      } else {
+        const arr = document.querySelectorAll('.loadingText');
+        let num = arr.length;
+        for (var i in arr) {
+          let cur = arr[i];
+          while (cur) {
+            if (cur.style && cur.style.display == 'none') {
+              num--;
+              cur=false;
+              break;
+            }
+            if(cur) {
+              cur = cur.parentNode;
+            }
+          }
+        }
+
+        if (num === 0) {
+          return true;
+        }
+        //document.querySelectorAll('.loadingText')[0].parentNode.parentNode.parentNode.style.display
+      }
+    }, {timeout: 2000});
+  } catch(error) {
+    console.log('error',error);
+  }
+  if(url.indexOf('/interactive_chart/')>-1) {
+    await page.waitFor(500);
+  }
   let iReturn=await page.content();
   page.close();
   pagesRender++;
+
+  if(options.removeScripts) {
+    iReturn=iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,'');
+  }
+
   return {page:iReturn,headers:response.headers};
 }
 
@@ -74,7 +116,6 @@ class Cache
 {
   constructor(props) {
     this.working={};
-    console.log('constructor fired!');
   }
   getCache(url) {
     const path=this.getCacheFilePath(url);
@@ -123,7 +164,7 @@ app.get('/', function (req, res) {
       res.send(cache.page);
     } else {
       console.log(`request page: ${req.query.url}`);
-      getPage(req.query.url).then((data)=> {
+      getPage(req.query.url, { removeScripts:true }).then((data)=> {
         Cacher.setCache(req.query.url,data);
         res.send(data.page);
       });
