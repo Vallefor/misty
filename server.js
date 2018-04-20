@@ -226,6 +226,15 @@ app.get('/', function (req, res) {
   }
 });
 
-app.listen(port, function () {
-  console.log(`Misty listening on port ${port}!`);
-});
+var args = process.argv.slice(2);
+console.log('args',args);
+
+if(args.indexOf('--localhost')!==false) {
+  app.listen(port,'localhost', function () {
+    console.log(`Misty listening on port ${port}!`);
+  });
+} else {
+  app.listen(port, function () {
+    console.log(`Misty listening on port ${port}!`);
+  });
+}
