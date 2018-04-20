@@ -229,9 +229,9 @@ app.get('/', function (req, res) {
 var args = process.argv.slice(2);
 console.log('args',args);
 
-if(args.indexOf('--localhost')!==false) {
+if(args.indexOf('--localhost')!==-1) {
   app.listen(port,'localhost', function () {
-    console.log(`Misty listening on port ${port}!`);
+    console.log(`Misty listening localhost on port ${port}!`);
   });
 } else {
   app.listen(port, function () {
