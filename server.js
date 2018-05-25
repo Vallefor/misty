@@ -10,7 +10,7 @@ const port=9999;
 
 const restartChromeOn=100; //restart chrom if we open over 100 pages
 const closeChromeTimeout=1000*60*5; //close chrome if no requests for 5 minutes
-
+const loadingSelector='.common-loading';
 
 let browser;
 let pagesRender=0;
@@ -101,10 +101,12 @@ async function getPage(url, options={}) {
   if(!options.goto) {
     try {
       await page.waitForFunction(function () {
-        if (document.querySelectorAll('.loadingText').length == 0) {
+        let loadingSelector=arguments[0].loading_selector;
+        console.log('loadingSelector',loadingSelector);
+        if (document.querySelectorAll(loadingSelector).length == 0) {
           return true;
         } else {
-          const arr = document.querySelectorAll('.loadingText');
+          const arr = document.querySelectorAll(loadingSelector);
           let num = arr.length;
           for (var i in arr) {
             let cur = arr[i];
@@ -125,7 +127,7 @@ async function getPage(url, options={}) {
           }
           //document.querySelectorAll('.loadingText')[0].parentNode.parentNode.parentNode.style.display
         }
-      }, {timeout: 2000});
+      }, {timeout: 2000},{ loading_selector:loadingSelector });
     } catch (error) {
       console.log('error', error);
     }
