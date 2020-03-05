@@ -221,7 +221,7 @@ app.get('/', function (req, res) {
         });
       } else {
         console.log('var 2');
-        getPage(req.query.url, {removeScripts: true}).then((data) => {
+        getPage(req.query.url, {removeScripts: true, goto:{ waitUntil:'networkidle0' }}).then((data) => {
           Cacher.setCache(req.query.url, data);
           res.send(data.page);
         });
