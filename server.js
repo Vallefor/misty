@@ -27,6 +27,10 @@ if (enableCache && !fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir);
 }
 
+if (enableCache && !fs.existsSync('./chrome_cache')) {
+    fs.mkdirSync('./chrome_cache');
+}
+
 let chromeTa=false;
 
 function log(str) {
@@ -52,7 +56,7 @@ async function getPage(url, options={}) {
       console.log('stop chrome by pages render');
       await browser.close();
     }
-    browser = await puppeteer.launch({args: ['--no-sandbox']});
+    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache' });
   }
   const page = await browser.newPage();
 
