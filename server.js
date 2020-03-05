@@ -127,7 +127,7 @@ async function getPage(url, options={}) {
           }
           //document.querySelectorAll('.loadingText')[0].parentNode.parentNode.parentNode.style.display
         }
-      }, {timeout: 2000},{ loading_selector:loadingSelector });
+      }, {timeout: 10000},{ loading_selector:loadingSelector });
     } catch (error) {
       console.log('error', error);
     }
@@ -201,10 +201,10 @@ const Cacher=new Cache();
 app.get('/', function (req, res) {
   if(req.query.url) {
     let cache;
-    if(enableCache) {
+    if(enableCache && !req.query.clear_cache) {
       cache = Cacher.getCache(req.query.url);
     }
-    if(enableCache && cache) {
+    if(enableCache && cache && !req.query.clear_cache) {
       console.log(`from cache: ${req.query.url}`);
       res.send(cache.page);
     } else {
