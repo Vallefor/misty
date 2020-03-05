@@ -80,9 +80,9 @@ async function getPage(url, options={}) {
   console.log('Setting Viewport');
   await page.setViewport({width: options.width?options.width:1280, height: options.height?options.height:800 });
   //await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  console.log('Goto...');
+  console.log(`Goto: ${goto}`);
   const response=await page.goto(url,options.goto?options.goto:{});
-  console.log('Goto done');
+  console.log(`Goto done: ${goto}`);
   if(options.square) {
     let square=await page.evaluate(()=>{
       const height=document.body.clientHeight;
