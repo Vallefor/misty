@@ -4,8 +4,8 @@ const app = express();
 const md5 = require('md5');
 const fs = require('fs');
 const cacheDir = './tmp';
-const enableCache=false;
-const cacheTime=5;
+const enableCache=true;
+const cacheTime=90000; //1 day cache
 const port=9999;
 
 const restartChromeOn=100; //restart chrom if we open over 100 pages
