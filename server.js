@@ -10,7 +10,7 @@ const port=9999;
 
 const restartChromeOn=100; //restart chrom if we open over 100 pages
 const closeChromeTimeout=1000*60*5; //close chrome if no requests for 5 minutes
-const loadingSelector='.common-loading';
+const loadingSelector='.loader';
 
 let browser;
 let pagesRender=0;
@@ -36,7 +36,9 @@ let chromeTa=false;
 function log(str) {
   console.log(str);
 }
-
+function strEndsWith(str, suffix) {
+    return str.match(suffix+"$")==suffix;
+}
 async function getPage(url, options={}) {
   clearTimeout(chromeTa);
 
@@ -56,7 +58,7 @@ async function getPage(url, options={}) {
       console.log('stop chrome by pages render');
       await browser.close();
     }
-    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache' });
+    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache', headless: false });
   }
   const page = await browser.newPage();
 
@@ -65,12 +67,13 @@ async function getPage(url, options={}) {
     await page.setRequestInterception(true);
     page.on('request', interceptedRequest => {
       if (
-        interceptedRequest.url.endsWith('.png') ||
-        interceptedRequest.url.endsWith('.jpg') ||
-        interceptedRequest.url.endsWith('.jpeg') ||
-        interceptedRequest.url.endsWith('.gif') ||
-        interceptedRequest.url.endsWith('.svg') ||
-        interceptedRequest.url.endsWith('.css')
+        interceptedRequest.url().endsWith('.png') ||
+        interceptedRequest.url().endsWith('.jpg') ||
+        interceptedRequest.url().endsWith('.woff2') ||
+        interceptedRequest.url().endsWith('.jpeg') ||
+        interceptedRequest.url().endsWith('.gif') ||
+        interceptedRequest.url().endsWith('.svg') ||
+        interceptedRequest.url().endsWith('.css')
       ) {
         interceptedRequest.abort();
       } else {
@@ -81,11 +84,15 @@ async function getPage(url, options={}) {
     console.log('As png. Load full page.');
   }
 
+
   console.log('Setting Viewport');
   await page.setViewport({width: options.width?options.width:1280, height: options.height?options.height:800 });
-  //await page.waitForNavigation({ waitUntil: 'networkidle0' });
+
   console.log(`Goto: ${url}`);
-  const response=await page.goto(url,options.goto?options.goto:{});
+
+  const response=page.goto(url,options.goto?options.goto:{ waitUntil: 'domcontentloaded' });
+  console.log('wait goto');
+  await response;
   console.log(`Goto done: ${url}`);
   if(options.square) {
     let square=await page.evaluate(()=>{
@@ -102,44 +109,104 @@ async function getPage(url, options={}) {
     await page.setViewport({width: square, height: square });
 
   }
-  if(!options.goto) {
-    try {
-      await page.waitForFunction(function () {
-        let loadingSelector=arguments[0].loading_selector;
-        console.log('loadingSelector',loadingSelector);
-        if (document.querySelectorAll(loadingSelector).length == 0) {
-          return true;
-        } else {
-          const arr = document.querySelectorAll(loadingSelector);
-          let num = arr.length;
-          for (var i in arr) {
-            let cur = arr[i];
-            while (cur) {
-              if (cur.style && cur.style.display == 'none') {
-                num--;
-                cur = false;
-                break;
-              }
-              if (cur) {
-                cur = cur.parentNode;
-              }
-            }
-          }
-
-          if (num === 0) {
-            return true;
-          }
-          //document.querySelectorAll('.loadingText')[0].parentNode.parentNode.parentNode.style.display
-        }
-      }, {timeout: 10000},{ loading_selector:loadingSelector });
-    } catch (error) {
-      console.log('error', error);
-    }
-  }
 
   if(url.indexOf('/interactive_chart/')>-1) {
     await page.waitFor(500);
   }
+  // await page.waitFor(1000);
+
+
+  const waitForFunc = page.waitForFunction((loadingSelector)=>{
+    if(!document.getElementById('root') || document.getElementById('root').innerHTML === '') {
+      return false;
+    } else {
+      if(document.querySelectorAll(loadingSelector).length === 0) {
+        return true;
+      }
+    }
+    return false;
+  }, {timeout: 20000}, loadingSelector);
+
+  console.log('waitForFunc: '+url);
+  let wwfError=false;
+  try {
+    await waitForFunc;
+  } catch (e) {
+    wwfError=true;
+    console.log('waitForFunc ERROR: '+url);
+  }
+
+/*
+  console.log('wait waitForFunction #root.innerHTML');
+  let success=false;
+  let tryes=10;
+  while(tryes>0) {
+    tryes--;
+    console.log('try: '+tryes);
+    const waitForFunc = page.waitForFunction("document.querySelector('#root').innerHTML!=''", {timeout: 2000});
+    waitForFunc.then(()=>{
+      success=true;
+      console.log("promise ok");
+    }).catch((e) => {
+      success=false;
+      console.log("promise error");
+    });
+    try {
+      await waitForFunc;
+    } catch (e) {
+      console.log('await error');
+    }
+
+    console.log("success state: "+(success?'true':'false'));
+    if(!success) {
+      await page.waitFor(500);
+    } else {
+      break;
+    }
+  }
+
+  console.log('wait waitForFunction .loader.length');
+  success=false;
+  tryes=10;
+  while(tryes>0) {
+    tryes--;
+    console.log('try: '+tryes);
+    const waitForFunc = page.waitForFunction("document.querySelectorAll('.loader').length === 0", { timeout: 2000 });
+    waitForFunc.then(()=>{
+      success=true;
+      console.log("promise ok");
+    }).catch((e) => {
+      success=false;
+      console.log("promise error");
+    });
+    try {
+      await waitForFunc;
+    } catch (e) {
+      console.log('await error');
+    }
+
+    console.log("success state: "+(success?'true':'false'));
+    if(!success) {
+      await page.waitFor(500);
+    } else {
+      break;
+    }
+  }
+  console.log('go next');
+  */
+  /*console.log('wait waitForSelector');
+  await page.waitForSelector('#root div div div');*/
+  /*
+  if(!options.goto) {
+    console.log('implement waitForFunction');
+    try {
+
+    } catch (error) {
+      console.log('error loading url (timeout)', url,error);
+    }
+  }
+ */
+
   if(options.as==='png') {
     console.log('screenshot start!');
     let iReturn = await page.screenshot({ omitBackground:true, type:'png' });
@@ -149,14 +216,17 @@ async function getPage(url, options={}) {
     return {page: iReturn, headers: response.headers};
   } else {
     let iReturn = await page.content();
+
     page.close();
     pagesRender++;
 
     if (options.removeScripts) {
       iReturn = iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     }
+    iReturn = iReturn.replace('/packs/css/stockrow-','https://stockrow.com/packs/css/stockrow-');
 
-    return {page: iReturn, headers: response.headers};
+
+    return {page: iReturn, headers: response.headers, wwfError:wwfError};
   }
 }
 
@@ -221,8 +291,10 @@ app.get('/', function (req, res) {
         });
       } else {
         console.log('var 2');
-        getPage(req.query.url, {removeScripts: true, goto:{ waitUntil:'networkidle0' }}).then((data) => {
-          Cacher.setCache(req.query.url, data);
+        getPage(req.query.url, {removeScripts: true}).then((data) => {
+          if(!data.wwfError) {
+            Cacher.setCache(req.query.url, data);
+          }
           res.send(data.page);
         });
       }
