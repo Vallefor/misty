@@ -92,7 +92,13 @@ async function getPage(url, options={}) {
 
   const response=page.goto(url,options.goto?options.goto:{ waitUntil: 'domcontentloaded' });
   console.log('wait goto');
-  await response;
+  let wwfError=false;
+  try {
+    await response;
+  } catch (e) {
+    wwfError=true;
+    console.log("goto error: ",e);
+  }
   console.log(`Goto done: ${url}`);
   if(options.square) {
     let square=await page.evaluate(()=>{
@@ -115,25 +121,25 @@ async function getPage(url, options={}) {
   }
   // await page.waitFor(1000);
 
-
-  const waitForFunc = page.waitForFunction((loadingSelector)=>{
-    if(!document.getElementById('root') || document.getElementById('root').innerHTML === '') {
-      return false;
-    } else {
-      if(document.querySelectorAll(loadingSelector).length === 0) {
-        return true;
+  if(!wwfError) {
+    const waitForFunc = page.waitForFunction((loadingSelector) => {
+      if (!document.getElementById('root') || document.getElementById('root').innerHTML === '') {
+        return false;
+      } else {
+        if (document.querySelectorAll(loadingSelector).length === 0) {
+          return true;
+        }
       }
-    }
-    return false;
-  }, {timeout: 20000}, loadingSelector);
+      return false;
+    }, {timeout: 20000}, loadingSelector);
 
-  console.log('waitForFunc: '+url);
-  let wwfError=false;
-  try {
-    await waitForFunc;
-  } catch (e) {
-    wwfError=true;
-    console.log('waitForFunc ERROR: '+url);
+    console.log('waitForFunc: ' + url);
+    try {
+      await waitForFunc;
+    } catch (e) {
+      wwfError = true;
+      console.log('waitForFunc ERROR: ' + url);
+    }
   }
 
 /*
