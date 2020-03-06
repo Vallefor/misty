@@ -223,7 +223,7 @@ async function getPage(url, options={}) {
     if (options.removeScripts) {
       iReturn = iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     }
-    iReturn = iReturn.replace('/packs/css/stockrow-','https://stockrow.com/packs/css/stockrow-');
+    //iReturn = iReturn.replace('/packs/css/stockrow-','https://stockrow.com/packs/css/stockrow-');
 
 
     return {page: iReturn, headers: response.headers, wwfError:wwfError};
