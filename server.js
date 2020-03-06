@@ -58,7 +58,7 @@ async function getPage(url, options={}) {
       console.log('stop chrome by pages render');
       await browser.close();
     }
-    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache', headless: false });
+    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache'});
   }
   const page = await browser.newPage();
 
