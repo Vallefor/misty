@@ -5,7 +5,7 @@ const md5 = require('md5');
 const fs = require('fs');
 const cacheDir = './tmp';
 const enableCache=true;
-const cacheTime=90000*5; //5 days cache
+const cacheTime=90000*5; //~5 days cache
 const port=9999;
 
 const restartChromeOn=100; //restart chrom if we open over 100 pages
@@ -13,15 +13,38 @@ const closeChromeTimeout=1000*60*5; //close chrome if no requests for 5 minutes
 const loadingSelector='.loader';
 
 let browser;
+let browserHidden;
+let restarting=false;
 let pagesRender=0;
 
 process.stdin.resume();
-process.on('exit', ()=>{
-  if(browser) {
-    browser.close();
+
+function exitApp() {
+  console.log('Starting graceful shutdown');
+  if (browser) {
+    console.log('Closing browser');
+    browser.close().then(()=>{
+      console.log('Browser closed');
+      process.exit();
+    });
+  } else {
+    console.log("Just exit");
+    process.exit();
   }
-  process.exit();
+
+}
+
+process.on('SIGINT', () => {
+  console.info('SIGINT signal received.');
+  exitApp();
+
 });
+process.on('SIGTERM', () => {
+  console.info('SIGTERM signal received.');
+  exitApp();
+});
+
+
 
 if (enableCache && !fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir);
@@ -39,6 +62,67 @@ function log(str) {
 function strEndsWith(str, suffix) {
     return str.match(suffix+"$")==suffix;
 }
+function lunchBrowser() {
+  return puppeteer.launch({args: ['--no-sandbox'], 'userDataDir': './chrome_cache', headless: true});
+}
+function getBrowser()
+{
+  if(restarting) {
+    console.log("Browser in restart state");
+    return new Promise((resolve)=>{
+      setTimeout(()=>{
+        console.log("Check if already restarted?");
+        resolve(getBrowser());
+      },500);
+    });
+  }
+  return new Promise((resolve)=>{
+    if(!browser || pagesRender>=restartChromeOn) {
+      restarting=true;
+       if(browser) {
+         console.log('Reopen browser');
+         pagesRender=0;
+
+         const tmpFunc=()=>{
+           browser.pages().then((pages)=>{
+             console.log("Pages opened: ", pages.length);
+             if(pages.length<=1) {
+               browser.close().then(()=>{
+                 console.log("Old Browser closed");
+                 lunchBrowser().then((exemplar)=>{
+                   console.log("New brower opened");
+                   browser=exemplar;
+                   restarting=false;
+                   resolve(browser);
+                 });
+               });
+             } else {
+               console.log("Wait for all pages close");
+               setTimeout(()=>{
+                 tmpFunc();
+               },100)
+
+             }
+           });
+         };
+
+         tmpFunc();
+
+
+       } else {
+         lunchBrowser().then((exemplar)=>{
+           browser=exemplar;
+           restarting=false;
+           resolve(browser);
+         });
+       }
+
+     } else {
+      resolve(browser);
+    }
+
+  })
+}
 async function getPage(url, options={}) {
   clearTimeout(chromeTa);
 
@@ -52,14 +136,7 @@ async function getPage(url, options={}) {
     }
   },closeChromeTimeout);
 
-  if(!browser || pagesRender==restartChromeOn) {
-    if(browser) {
-      pagesRender=0;
-      console.log('stop chrome by pages render');
-      await browser.close();
-    }
-    browser = await puppeteer.launch({args: ['--no-sandbox'], 'userDataDir':'./chrome_cache'});
-  }
+  browser=await getBrowser();
   const page = await browser.newPage();
 
   //do not load images, svg and css
@@ -290,13 +367,11 @@ app.get('/', function (req, res) {
     } else {
       console.log(`request page: ${req.query.url} as=${req.query.as}`, req.query);
       if(req.query.as=='png') {
-        console.log('var 1');
         getPage(req.query.url, { goto:{ waitUntil:'networkidle0' }, as:'png', square:req.query.square?true:false }).then((data) => {
           //Cacher.setCache(req.query.url, data);
           res.send(data.page);
         });
       } else {
-        console.log('var 2');
         getPage(req.query.url, {removeScripts: true}).then((data) => {
           if(!data.wwfError) {
             Cacher.setCache(req.query.url, data);
@@ -322,3 +397,4 @@ if(args.indexOf('--localhost')!==-1) {
     console.log(`Misty listening on port ${port}!`);
   });
 }
+
