@@ -11,6 +11,9 @@ const port=9999;
 const restartChromeOn=100; //restart chrom if we open over 100 pages
 const closeChromeTimeout=1000*60*5; //close chrome if no requests for 5 minutes
 const loadingSelector='.loader';
+const parseContentFunc=(content)=>{
+  return content.replace(/\/packs\/css\/stockrow([\-0-9a-z]+)\.css/gi,'/packs/css/stockrow.css');
+};
 
 let browser;
 let browserHidden;
@@ -306,7 +309,7 @@ async function getPage(url, options={}) {
     if (options.removeScripts) {
       iReturn = iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     }
-    //iReturn = iReturn.replace('/packs/css/stockrow-','https://stockrow.com/packs/css/stockrow-');
+    iReturn=parseContentFunc(iReturn);
 
 
     return {page: iReturn, headers: response.headers, wwfError:wwfError};
