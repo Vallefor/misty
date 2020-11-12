@@ -22,6 +22,25 @@ let pagesRender=0;
 
 process.stdin.resume();
 
+async function autoScroll(page){
+    await page.evaluate(async () => {
+        await new Promise((resolve, reject) => {
+            var totalHeight = 0;
+            var distance = 100;
+            var timer = setInterval(() => {
+                var scrollHeight = document.body.scrollHeight;
+                window.scrollBy(0, distance);
+                totalHeight += distance;
+
+                if(totalHeight >= scrollHeight){
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 10);
+        });
+    });
+}
+
 function exitApp() {
   console.log('Starting graceful shutdown');
   if (browser) {
@@ -129,31 +148,31 @@ function getBrowser()
 async function getPage(url, options={}) {
   clearTimeout(chromeTa);
 
-  chromeTa=setTimeout(()=>{
-    if(browser) {
-      browser.close().then(()=>{
-        browser=false;
+  chromeTa = setTimeout(() => {
+    if (browser) {
+      browser.close().then(() => {
+        browser = false;
       });
 
       console.log('close chrome by timeout');
     }
-  },closeChromeTimeout);
+  }, closeChromeTimeout);
 
-  browser=await getBrowser();
+  browser = await getBrowser();
   const page = await browser.newPage();
 
   //do not load images, svg and css
-  if(options.as!=='png') {
+  if (options.as !== 'png' && options.as !== 'pdf') {
     await page.setRequestInterception(true);
     page.on('request', interceptedRequest => {
       if (
-        interceptedRequest.url().endsWith('.png') ||
-        interceptedRequest.url().endsWith('.jpg') ||
-        interceptedRequest.url().endsWith('.woff2') ||
-        interceptedRequest.url().endsWith('.jpeg') ||
-        interceptedRequest.url().endsWith('.gif') ||
-        interceptedRequest.url().endsWith('.svg') ||
-        interceptedRequest.url().endsWith('.css')
+          interceptedRequest.url().endsWith('.png') ||
+          interceptedRequest.url().endsWith('.jpg') ||
+          interceptedRequest.url().endsWith('.woff2') ||
+          interceptedRequest.url().endsWith('.jpeg') ||
+          interceptedRequest.url().endsWith('.gif') ||
+          interceptedRequest.url().endsWith('.svg') ||
+          interceptedRequest.url().endsWith('.css')
       ) {
         interceptedRequest.abort();
       } else {
@@ -161,54 +180,54 @@ async function getPage(url, options={}) {
       }
     });
   } else {
-    console.log('As png. Load full page.');
+    console.log('Load full page.');
   }
 
 
   console.log('Setting Viewport');
-  await page.setViewport({width: options.width?options.width:1280, height: options.height?options.height:800 });
+  await page.setViewport({width: options.width ? options.width : 1280, height: options.height ? options.height : 800});
 
   console.log(`Goto: ${url}`);
 
-  const response=page.goto(url,options.goto?options.goto:{ waitUntil: 'domcontentloaded' });
+  const response = page.goto(url, options.goto ? options.goto : {waitUntil: 'domcontentloaded'});
   console.log('wait goto');
-  let wwfError=false;
+  let wwfError = false;
   try {
     await response;
   } catch (e) {
-    wwfError=true;
-    console.log("goto error: ",e);
+    wwfError = true;
+    console.log("goto error: ", e);
   }
   console.log(`Goto done: ${url}`);
-  if(options.square) {
-    let square=await page.evaluate(()=>{
-      const height=document.body.clientHeight;
-      const width=document.body.clientWidth;
-      if(width>height) {
+  if (options.square) {
+    let square = await page.evaluate(() => {
+      const height = document.body.clientHeight;
+      const width = document.body.clientWidth;
+      if (width > height) {
         return height;
       }
-      if(height>=width) {
+      if (height >= width) {
         return width;
       }
     });
     console.log(`square = ${square}`);
-    await page.setViewport({width: square, height: square });
+    await page.setViewport({width: square, height: square});
 
   }
 
-  if(url.indexOf('/interactive_chart/')>-1) {
+  if (url.indexOf('/interactive_chart/') > -1) {
     await page.waitFor(500);
   }
   // await page.waitFor(1000);
 
-  if(!wwfError) {
+  if (!wwfError) {
     const waitForFunc = page.waitForFunction((loadingSelector) => {
-      if (!document.getElementById('root') || document.getElementById('root').innerHTML === '') {
-        return false;
-      } else {
-        if (document.querySelectorAll(loadingSelector).length === 0) {
-          return true;
-        }
+//      if (!document.getElementById('root') || document.getElementById('root').innerHTML === '') {
+//        return false;
+//      } else {
+      if (document.querySelectorAll(loadingSelector).length === 0) {
+        return true;
+//        }
       }
       return false;
     }, {timeout: 20000}, loadingSelector);
@@ -222,64 +241,64 @@ async function getPage(url, options={}) {
     }
   }
 
-/*
-  console.log('wait waitForFunction #root.innerHTML');
-  let success=false;
-  let tryes=10;
-  while(tryes>0) {
-    tryes--;
-    console.log('try: '+tryes);
-    const waitForFunc = page.waitForFunction("document.querySelector('#root').innerHTML!=''", {timeout: 2000});
-    waitForFunc.then(()=>{
-      success=true;
-      console.log("promise ok");
-    }).catch((e) => {
-      success=false;
-      console.log("promise error");
-    });
-    try {
-      await waitForFunc;
-    } catch (e) {
-      console.log('await error');
+  /*
+    console.log('wait waitForFunction #root.innerHTML');
+    let success=false;
+    let tryes=10;
+    while(tryes>0) {
+      tryes--;
+      console.log('try: '+tryes);
+      const waitForFunc = page.waitForFunction("document.querySelector('#root').innerHTML!=''", {timeout: 2000});
+      waitForFunc.then(()=>{
+        success=true;
+        console.log("promise ok");
+      }).catch((e) => {
+        success=false;
+        console.log("promise error");
+      });
+      try {
+        await waitForFunc;
+      } catch (e) {
+        console.log('await error');
+      }
+
+      console.log("success state: "+(success?'true':'false'));
+      if(!success) {
+        await page.waitFor(500);
+      } else {
+        break;
+      }
     }
 
-    console.log("success state: "+(success?'true':'false'));
-    if(!success) {
-      await page.waitFor(500);
-    } else {
-      break;
-    }
-  }
+    console.log('wait waitForFunction .loader.length');
+    success=false;
+    tryes=10;
+    while(tryes>0) {
+      tryes--;
+      console.log('try: '+tryes);
+      const waitForFunc = page.waitForFunction("document.querySelectorAll('.loader').length === 0", { timeout: 2000 });
+      waitForFunc.then(()=>{
+        success=true;
+        console.log("promise ok");
+      }).catch((e) => {
+        success=false;
+        console.log("promise error");
+      });
+      try {
+        await waitForFunc;
+      } catch (e) {
+        console.log('await error');
+      }
 
-  console.log('wait waitForFunction .loader.length');
-  success=false;
-  tryes=10;
-  while(tryes>0) {
-    tryes--;
-    console.log('try: '+tryes);
-    const waitForFunc = page.waitForFunction("document.querySelectorAll('.loader').length === 0", { timeout: 2000 });
-    waitForFunc.then(()=>{
-      success=true;
-      console.log("promise ok");
-    }).catch((e) => {
-      success=false;
-      console.log("promise error");
-    });
-    try {
-      await waitForFunc;
-    } catch (e) {
-      console.log('await error');
+      console.log("success state: "+(success?'true':'false'));
+      if(!success) {
+        await page.waitFor(500);
+      } else {
+        break;
+      }
     }
-
-    console.log("success state: "+(success?'true':'false'));
-    if(!success) {
-      await page.waitFor(500);
-    } else {
-      break;
-    }
-  }
-  console.log('go next');
-  */
+    console.log('go next');
+    */
   /*console.log('wait waitForSelector');
   await page.waitForSelector('#root div div div');*/
   /*
@@ -293,26 +312,41 @@ async function getPage(url, options={}) {
   }
  */
 
-  if(options.as==='png') {
+  if (options.as === 'png') {
     console.log('screenshot start!');
-    let iReturn = await page.screenshot({ omitBackground:true, type:'png' });
+    await autoScroll(page);
+    let iReturn = await page.screenshot({omitBackground: true, type: 'png'});
     console.log('screenshot done!');
     page.close();
     pagesRender++;
     return {page: iReturn, headers: response.headers};
   } else {
-    let iReturn = await page.content();
 
-    page.close();
-    pagesRender++;
+    if (options.as === 'pdf') {
+      console.log('pdf start!');
+      await page.emulateMedia('screen');
+      await autoScroll(page);
+      let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4' });
+      console.log('pdf done!');
+      page.close();
+      pagesRender++;
+      return {page: iReturn, headers: response.headers};
+    } else {
 
-    if (options.removeScripts) {
-      iReturn = iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+      let iReturn = await page.content();
+
+      page.close();
+      pagesRender++;
+
+      if (options.removeScripts) {
+        iReturn = iReturn.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      }
+      iReturn = parseContentFunc(iReturn);
+
+
+      return {page: iReturn, headers: response.headers, wwfError: wwfError};
     }
-    iReturn=parseContentFunc(iReturn);
-
-
-    return {page: iReturn, headers: response.headers, wwfError:wwfError};
   }
 }
 
@@ -369,18 +403,33 @@ app.get('/', function (req, res) {
       res.send(cache.page);
     } else {
       console.log(`request page: ${req.query.url} as=${req.query.as}`, req.query);
-      if(req.query.as=='png') {
-        getPage(req.query.url, { goto:{ waitUntil:'networkidle0' }, as:'png', square:req.query.square?true:false }).then((data) => {
+      if (req.query.as == 'png') {
+        getPage(req.query.url, {
+          goto: {waitUntil: 'networkidle0'},
+          as: 'png',
+          square: req.query.square ? true : false
+        }).then((data) => {
           //Cacher.setCache(req.query.url, data);
           res.send(data.page);
         });
       } else {
-        getPage(req.query.url, {removeScripts: true}).then((data) => {
-          if(!data.wwfError) {
-            Cacher.setCache(req.query.url, data);
-          }
-          res.send(data.page);
-        });
+        if (req.query.as == 'pdf') {
+          getPage(req.query.url, {
+            goto: {waitUntil: 'networkidle0'},
+            as: 'pdf',
+            square: req.query.square ? true : false
+          }).then((data) => {
+            //Cacher.setCache(req.query.url, data);
+            res.send(data.page);
+          });
+        } else {
+          getPage(req.query.url, {removeScripts: true}).then((data) => {
+            if (!data.wwfError) {
+              Cacher.setCache(req.query.url, data);
+            }
+            res.send(data.page);
+          });
+        }
       }
     }
   } else {
