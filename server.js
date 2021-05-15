@@ -425,7 +425,9 @@ app.get('/', function (req, res) {
         } else {
           getPage(req.query.url, {removeScripts: true}).then((data) => {
             if (!data.wwfError) {
-              Cacher.setCache(req.query.url, data);
+              if(!req.query.do_not_cache) {
+                Cacher.setCache(req.query.url, data);
+              }
             }
             res.send(data.page);
           });
