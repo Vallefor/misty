@@ -326,7 +326,7 @@ async function getPage(url, options={}) {
       console.log('pdf start!');
       await page.emulateMedia('screen');
       await autoScroll(page);
-      let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4' });
+      let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4', landscape: options.landscape?true:false });
       console.log('pdf done!');
       page.close();
       pagesRender++;
@@ -417,6 +417,7 @@ app.get('/', function (req, res) {
           getPage(req.query.url, {
             goto: {waitUntil: 'networkidle0'},
             as: 'pdf',
+            landscape: req.query.landscape || false,
             square: req.query.square ? true : false
           }).then((data) => {
             //Cacher.setCache(req.query.url, data);
