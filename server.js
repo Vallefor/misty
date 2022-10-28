@@ -4,7 +4,7 @@ const app = express();
 const md5 = require('md5');
 const fs = require('fs');
 const cacheDir = './tmp';
-const enableCache=true;
+const enableCache=false;
 const cacheTime=90000*5; //~5 days cache
 const port=9999;
 
@@ -326,7 +326,7 @@ async function getPage(url, options={}) {
       console.log('pdf start!');
       await page.emulateMedia('screen');
       await autoScroll(page);
-      let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4', landscape: options.landscape?true:false });
+      let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4', landscape:options.landscape?true:false });
       console.log('pdf done!');
       page.close();
       pagesRender++;
@@ -407,7 +407,9 @@ app.get('/', function (req, res) {
         getPage(req.query.url, {
           goto: {waitUntil: 'networkidle0'},
           as: 'png',
-          square: req.query.square ? true : false
+          square: req.query.square ? true : false,
+          width: req.query.width || false,
+          height: req.query.height || false
         }).then((data) => {
           //Cacher.setCache(req.query.url, data);
           res.send(data.page);
@@ -418,7 +420,9 @@ app.get('/', function (req, res) {
             goto: {waitUntil: 'networkidle0'},
             as: 'pdf',
             landscape: req.query.landscape || false,
-            square: req.query.square ? true : false
+            square: req.query.square ? true : false,
+            width: req.query.width || false,
+            height: req.query.height || false
           }).then((data) => {
             //Cacher.setCache(req.query.url, data);
             res.send(data.page);
