@@ -408,8 +408,8 @@ app.get('/', function (req, res) {
           goto: {waitUntil: 'networkidle0'},
           as: 'png',
           square: req.query.square ? true : false,
-          width: req.query.width || false,
-          height: req.query.height || false
+          width: req.query.width?intval(req.query.width):false,
+          height: req.query.height?intval(req.query.height):false
         }).then((data) => {
           //Cacher.setCache(req.query.url, data);
           res.send(data.page);
@@ -421,8 +421,8 @@ app.get('/', function (req, res) {
             as: 'pdf',
             landscape: req.query.landscape || false,
             square: req.query.square ? true : false,
-            width: req.query.width || false,
-            height: req.query.height || false
+            width: req.query.width?intval(req.query.width):false,
+            height: req.query.height?intval(req.query.height):false
           }).then((data) => {
             //Cacher.setCache(req.query.url, data);
             res.send(data.page);
