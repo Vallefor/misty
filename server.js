@@ -85,7 +85,7 @@ function strEndsWith(str, suffix) {
     return str.match(suffix+"$")==suffix;
 }
 function lunchBrowser() {
-  return puppeteer.launch({args: ['--no-sandbox'], 'userDataDir': './chrome_cache', headless: true});
+  return puppeteer.launch({args: ['--no-sandbox'], 'userDataDir': './chrome_cache', headless: false});
 }
 function getBrowser()
 {
@@ -324,7 +324,7 @@ async function getPage(url, options={}) {
 
     if (options.as === 'pdf') {
       console.log('pdf start!');
-      await page.emulateMedia('screen');
+      await page.emulateMediaType('screen');
       await autoScroll(page);
       let iReturn = await page.pdf({omitBackground: true, printBackground:true, format:'A4', landscape:options.landscape?true:false });
       console.log('pdf done!');
@@ -428,7 +428,9 @@ app.get('/', function (req, res) {
             res.send(data.page);
           });
         } else {
-          getPage(req.query.url, {removeScripts: true}).then((data) => {
+          getPage(req.query.url, {
+            removeScripts: false, goto: {waitUntil: 'networkidle0'}
+          }).then((data) => {
             if (!data.wwfError) {
               if(!req.query.do_not_cache) {
                 Cacher.setCache(req.query.url, data);
